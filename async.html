@@ -1,0 +1,54 @@
+
+<html>
+
+<meta http-equiv="Content-Security-Policy"/>
+
+<script>
+function createFetcher() {
+    const cache = new Map();
+
+    return function fetch1(url, key) {
+        function inner() {
+            const item = cache.get(key);
+            if (item?.status === "fulfilled") {
+                return item;
+            }
+
+            const promise1 = fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    cache.set(key, {
+                        status: "fulfilled",
+                        value: data
+                    });
+                });
+
+            throw promise1;
+        }
+
+        try {
+            return inner();
+        } catch (e) {
+            if (e instanceof Promise) {
+                e.finally(() => inner());
+            }
+        }
+    };
+}
+
+
+const fetch1 = createFetcher();
+
+
+function m1() {
+    return fetch1('https://jsonplaceholder.typicode.com/todos/1', "key2");
+}
+
+function m2() {
+    return m1();
+}
+
+m2();
+
+</script>
+</html>

@@ -69,9 +69,7 @@ function throttle(fn) {
 
 // 5. rotate
 function rotateMatrix(matrix) {
-  const transposedMatrix = matrix[0].map((_, colIndex) =>
-    matrix.map(row => row[colIndex])
-  );
+  const transposedMatrix = matrix[0].map((_, colIndex) =>matrix.map(row => row[colIndex]));
 
   return transposedMatrix.map(row => row.reverse());
 }
@@ -85,53 +83,92 @@ const matrix = [
 const rotatedMatrix = rotateMatrix(matrix);
 
 // 6. curry fn
-function cur(fn) {
-  let a = [];
-  return function cur1(...args) {
-    a = [...a, ...args];
-    if (args.length == 0) {
-      return fn(...a)
-    }
-    return cur1;
+function cur(...args) {
+  return function(...args1) {
+      if ( args1.length === 0) {
+          console.log([...args, ...args1]);
+          return;
+      }
+      return cur([...args, ...args1]);
   }
 }
-function add(...args) {
-  console.log(args)
-}
-var a = cur(add);
-a(1, 2)(3)();
+cur(1)(2, 3)();
 
 // Array reduce with async functions
-const asyncReduce = async (arr, fn, initial) => {
-  let result = initial;
-  for (const item of arr) {
-    result = await fn(result, item);
-  }
-  return result;
-};
-asyncReduce([1,2,3], async (acc, val) => acc + val, 0).then(console.log); // 6
+async function asyncReduceSequential() {
+  const arr = [1, 2, 3, 4, 5];
+
+  await arr.reduce(async (prevPromise, next) => {
+      await prevPromise; // Wait for the previous operation
+      console.log(next);
+      return new Promise((res) => setTimeout(res, 1000)); // Simulate async task
+  }, Promise.resolve());
+}
+
+asyncReduceSequential();
 
 // Custom Promise.all implementation
-function customPromiseAll(promises) {
+function customPromise() {
+  let tasks = [1, 2, Promise.reject("err"), 4, 5];
   return new Promise((resolve, reject) => {
-    const results = [];
-    let completed = 0;
-    
-    if (promises.length === 0) return resolve([]);
-
-    promises.forEach((promise, index) => {
-      Promise.resolve(promise)
-        .then(result => {
-          results[index] = result;
-          completed++;
-          if (completed === promises.length) {
-            resolve(results);
+      let hasRejected = false;
+      
+      // Process tasks sequentially
+      let processNextTask = (index) => {
+     
+          if (index >= tasks.length) {
+              resolve(); // All tasks completed successfully
+              return;
           }
-        })
-        .catch(reject); // If any promise fails, reject immediately
-    });
+          
+          Promise.resolve(tasks[index])
+              .then((value) => {
+                  console.log(`log${value}`);
+                  processNextTask(index + 1);
+              })
+              .catch(() => {
+                  console.log("err");
+                  reject();
+              });
+      };
+      
+      processNextTask(0);
   });
 }
+
+customPromise().catch(() => console.log("Promise Rejected"));
+
+function customPromise() {
+  let tasks = [1, 2, Promise.reject("err"), 4, 5];
+  return new Promise((resolve, reject) => {
+      let results = [];
+      let completed = 0;
+      
+      // Process all tasks in order
+      tasks.forEach((task, index) => {
+          Promise.resolve(task)
+              .then(value => {
+                  console.log(`log${value}`);
+                  results[index] = { status: 'fulfilled', value };
+              })
+              .catch(error => {
+                  console.log("err");
+                  results[index] = { status: 'rejected', reason: error };
+              })
+              .finally(() => {
+                  completed++;
+                  if (completed === tasks.length) {
+                      // All promises have settled (either resolved or rejected)
+                      resolve(results);
+                  }
+              });
+      });
+  });
+}
+
+customPromise()
+  .then(results => console.log("All promises settled"))
+  .catch(() => console.log("This won't be called"));
 
 // Custom deep clone implementation
 function deepClone(value) {
@@ -170,46 +207,33 @@ const events = new Events();
 events.on('test', console.log);
 events.emit('test', 'hello'); // logs: hello
 
-// Map with concurrency limit
-async function limit() {
-  const limit = 2;
-  const arr = [1, 2, 3, 4, 5, 6];
-  const queue = [];
-  let current = 0;
-  let running = 0;
+async function limit(l) {
+  const arr = [1, 2, 3, 4, 5, 6]; 
+  let index = 0;
+  let result = [];
 
-  async function runner() {
-    while (arr.length > 0) {
-      if (running < limit) {
-        const item = arr.shift();
-        running++;
-        req(item).then((result) => {
-          queue[current] = result;
-          current++;
-          running--;
-          runner();
-            console.log(queue)
-        });
-      } else {
-        break;
+  async function processBatch() {
+      const batchPromises = [];
+      while (index < arr.length && batchPromises.length < l) {
+          batchPromises.push(req(arr[index++]).then((res) => {
+              result.push(res);
+          }));
       }
-    }
+
+      await Promise.all(batchPromises);
+      if (index < arr.length) {
+          await processBatch();
+      }
   }
 
-  for (let i = 0; i < limit; i++) {
-    runner();
-  }
-}
-
-function req(i) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      return resolve(i);
-    }, 1000);
+  return processBatch().then(() => {
+      return result;
   });
 }
 
-limit();
+limit(2).then((result) => {
+  console.log('Result:', result);
+});
 
 // Convert callback to promise
 const promisify = (fn) => (...args) => 
@@ -219,3 +243,66 @@ const promisify = (fn) => (...args) =>
 
 const readFile = promisify(fs.readFile);
 readFile('file.txt').then(console.log);
+
+function isPalindrome() {
+  const words = "abAAba";
+
+  let i = 0,
+      j = words.length - 1;
+  const isvalid = v => /[a-z0-9]/.test(v);
+  while (i < j) {
+
+
+      if (!isvalid(words[i])) {
+          i++;
+      }
+      if (!isvalid(words[j])) {
+          j--;
+      };
+      
+
+      if (words[i] === words[j]) {
+          i++;
+          j--;
+      } else if (words[i] !== words[j]) {
+          return false;
+      }
+  }
+  return true;
+}
+isPalindrome()
+
+
+function runpause() {
+  let ispause = false;
+  let i = 0;
+  const tasks = [1, 2, 3, 4, 5];
+
+  async function executeTasks() {
+      while (i < tasks.length) {
+          if (ispause) return;  // ✅ Now this works because execution can be interrupted
+          console.log(`Processing: ${tasks[i]}`);
+          i++;
+
+          // ✅ This creates a pause and lets other events (like pause()) be handled
+          await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      console.log("end");
+  }
+
+  return {
+      start: () => {
+          ispause = false;
+          executeTasks();
+      },
+      pause: () => {
+          console.log("Pause called!");
+          ispause = true;
+      }
+  };
+}
+
+const runner = runpause();
+runner.start();
+
+setTimeout(() => runner.pause(), 1200); // Pause after 1.2s
