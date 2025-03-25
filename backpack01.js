@@ -16,3 +16,4 @@ const weights = [2, 3, 1, 5];
 const values = [1, 3, 5, 7];
 
 console.log(knapsack(W, weights, values)); // Output: 12
+
